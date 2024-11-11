@@ -1,0 +1,103 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  ate-int-spaceman
+
+  Sample SAM Template for ate-int-spaceman
+
+
+Resources:
+
+  # parameterHelper: 
+  #   Type: AWS::Serverless::Application
+  #   Properties:
+  #     Location: parameterHelper.yaml
+  #     Parameters: 
+  #       SubnetIds: !Sub '/${Environment}/ate/parameters/network/subnet-ids'
+
+  # SgVpcEndpointS3Spaceman:
+  #   Type: AWS::EC2::SecurityGroup
+  #   Properties:
+  #     GroupDescription: "SG para VPC Endpoint de spaceman"
+  #     VpcId: !Sub  '{{resolve:ssm:/${Environment}/ate/parameters/network/vpc-id}}'
+  #     SecurityGroupIngress:
+  #       - IpProtocol: -1
+  #         CidrIp: 10.0.0.0/8
+  #     SecurityGroupEgress:
+  #       - IpProtocol: -1
+  #         CidrIp: 0.0.0.0/0
+
+  # VpcEndpointS3Spaceman:
+  #   Type: AWS::EC2::VPCEndpoint
+  #   Properties:
+  #     VpcId: !Sub  '{{resolve:ssm:/${Environment}/ate/parameters/network/vpc-id}}'
+  #     ServiceName: !Sub com.amazonaws.${AWS::Region}.s3
+  #     VpcEndpointType: Interface
+  #     SecurityGroupIds:
+  #       - !Ref SgVpcEndpointS3Spaceman
+  #     SubnetIds: !Split [',', !GetAtt parameterHelper.Outputs.SubnetIds]
+
+
+# Bucket para almacenar los json
+  JsonStorageBucketS3:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    Properties:
+      Tags:
+        - Key: Proyecto
+          Value: ATE
+        - Key: TipoApoyoATE
+          Value: Indirecto
+      BucketName: !Sub ${AWS::StackName}-${AWS::Region}-${AWS::AccountId}-planos
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+
+
+  ### DEFINICIÓN DE USUARIOS IAM
+  IAMUserForPlanos:
+    Type: AWS::IAM::User
+    DeletionPolicy: Retain
+    Properties:
+      UserName: !Sub ${AWS::StackName}-user-planos
+      Policies:
+        - PolicyName: !Sub ${AWS::StackName}-user-planos
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:ListBucket
+                  - s3:GetObject
+                  - s3:DeleteObject
+                Resource:
+                  - !Sub ${JsonStorageBucketS3.Arn}/*
+                  - !Sub ${JsonStorageBucketS3.Arn}
+
+  AccessKeyForPlanos:
+    Type: AWS::IAM::AccessKey
+    DeletionPolicy: Retain
+    Properties:
+      UserName: !Ref IAMUserForPlanos
+      Serial: 1
+  ### 
+
+  SecretManagerForIAMUserPlanosKeysS3:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub ate/user-planos
+      Description: Datos de acceso para el usuario IAM para S3
+      SecretString: !Sub '{"accesskey":"${AccessKeyForPlanos}","secretkey":"${AccessKeyForPlanos.SecretAccessKey}"}'
+
+Outputs:
+  JsonStorageBucketS3:
+    Description: Bucket para almacenar los json
+    Value: !Ref JsonStorageBucketS3
+
+  IAMUserForPlanos:
+    Description: Usuario IAM para Planos
+    Value: !Ref IAMUserForPlanos

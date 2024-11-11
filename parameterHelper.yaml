@@ -1,0 +1,15 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: "microservicios que comunican tienda en linea con el ERP"
+
+Parameters:
+  SubnetIds:
+    Type: AWS::SSM::Parameter::Value<String>
+
+Resources:
+  NullResource:
+    Type: AWS::CloudFormation::WaitConditionHandle
+
+Outputs:
+  SubnetIds:
+    Value: !Ref SubnetIds
